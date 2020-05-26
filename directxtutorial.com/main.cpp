@@ -18,6 +18,7 @@ struct custom_vertex
 };
 
 LPDIRECT3DVERTEXBUFFER9 VertexBuffer = NULL;
+LPDIRECT3DINDEXBUFFER9 IndexBuffer = NULL;
 LPDIRECT3D9 D3DInterface;
 LPDIRECT3DDEVICE9 D3DDevice;
 bool Running;
@@ -167,11 +168,6 @@ void RenderFrame(void)
     D3DDevice->BeginScene();
     D3DDevice->SetFVF(CUSTOMFVF); // select which vertex format we are using
 
-    // world transforms
-    //D3DXMATRIX MatWorldRotY;     // a matrix to store the rotation information
-    //D3DXMatrixRotationY(&MatWorldRotY, YRotation);
-    //D3DDevice->SetTransform(D3DTS_WORLD, &MatWorldRotY);
-
     // view transform
     D3DXMATRIX MatView;     // the view transform matrix
     D3DXMatrixLookAtLH(&MatView,
@@ -189,23 +185,15 @@ void RenderFrame(void)
                                100.0f); // the far view-plane
     D3DDevice->SetTransform(D3DTS_PROJECTION, &MatProjection);    // set the projection
 
+    // set the world transforms
+    D3DXMATRIX MatRotateY; // a matrix to store the rotation for each triangle
+    D3DXMatrixRotationY(&MatRotateY, YRotation); // the rotation matrix
+    D3DDevice->SetTransform(D3DTS_WORLD, &(MatRotateY)); // set the world transform
+
     // select the vertex buffer to display
     D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(custom_vertex));
-    D3DXMATRIX MatTranslateA; // a matrix to store the translation for triangle A
-    D3DXMATRIX MatTranslateB; // a matrix to store the translation for triangle B
-    D3DXMATRIX MatRotateY; // a matrix to store the rotation for each triangle
-    
-    // build MULTIPLE matrices to translate the model and one to rotate
-    D3DXMatrixTranslation(&MatTranslateA, 0.0f, 0.0f, 2.0f);
-    D3DXMatrixTranslation(&MatTranslateB, 0.0f, 0.0f, -2.0f);
-    D3DXMatrixRotationY(&MatRotateY, YRotation); // the front side
-
-    // tell Direct3D about each world transform, and then draw another triangle
-    D3DDevice->SetTransform(D3DTS_WORLD, &(MatTranslateA * MatRotateY));
-    D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
-
-    D3DDevice->SetTransform(D3DTS_WORLD, &(MatTranslateB * MatRotateY));
-    D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
+    D3DDevice->SetIndices(IndexBuffer);
+    D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 10, 0, 6);
 
     D3DDevice->EndScene();
     D3DDevice->Present(NULL, NULL, NULL, NULL);
@@ -215,6 +203,7 @@ void RenderFrame(void)
 void ReleaseD3D(void)
 {
     VertexBuffer->Release();
+    IndexBuffer->Release();
     D3DDevice->Release();
     D3DInterface->Release();
 }
@@ -222,23 +211,61 @@ void ReleaseD3D(void)
 
 void InitGraphics()
 {
-    // create the TriangleVertices using the CUSTOMVERTEX struct
-    custom_vertex TriangleVertices[] =
+    // --------------------------
+    // create vertex buffer
+    // create the Vertices using the custom_vertex struct
+    custom_vertex Vertices[] =
     {
-        {2.5f, -3.0f, 0.0f, D3DCOLOR_XRGB(0, 0, 255), },
-        {0.0f, 3.0f, 0.0f, D3DCOLOR_XRGB(0, 255, 0), },
-        {-2.5f, -3.0f, 0.0f, D3DCOLOR_XRGB(255, 0, 0), },
-    };
+        // fuselage
+        {3.0f, 0.0f, 0.0f, D3DCOLOR_XRGB(0, 255, 0), },
+        {0.0f, 3.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
+        {0.0f, 0.0f, 10.0f, D3DCOLOR_XRGB(255, 0, 0), },
+        {-3.0f, 0.0f, 0.0f, D3DCOLOR_XRGB(0, 255, 255), },
 
+        // left gun
+        {3.2f, -1.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
+        {3.2f, -1.0f, 11.0f, D3DCOLOR_XRGB(0, 255, 0), },
+        {2.0f, 1.0f, 2.0f, D3DCOLOR_XRGB(255, 0, 0), },
+
+        // right gun
+        {-3.2f, -1.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
+        {-3.2f, -1.0f, 11.0f, D3DCOLOR_XRGB(0, 255, 0), },
+        {-2.0f, 1.0f, 2.0f, D3DCOLOR_XRGB(255, 0, 0), },
+    };
     // create a vertex buffer interface called VertexBuffer
-    D3DDevice->CreateVertexBuffer(3 * sizeof(custom_vertex),
+    D3DDevice->CreateVertexBuffer(10 * sizeof(custom_vertex),
                                   0, CUSTOMFVF,
                                   D3DPOOL_MANAGED,
                                   &VertexBuffer, NULL);
-
     VOID *BufferBeginning;
-    // lock VertexBuffer and load the TriangleVertices into it
+    // lock VertexBuffer and load the Vertices into it
     VertexBuffer->Lock(0, 0, (void **) &BufferBeginning, 0);
-    memcpy(BufferBeginning, TriangleVertices, sizeof(TriangleVertices));
+    memcpy(BufferBeginning, Vertices, sizeof(Vertices));
     VertexBuffer->Unlock();
+
+    // ---------------------------
+    // create index buffer
+    // create the Indices using an int array
+    short Indices[] =
+    {
+        0, 1, 2,    // fuselage
+        2, 1, 3,
+        3, 1, 0,
+        0, 2, 3,
+        4, 5, 6,    // wings
+        7, 8, 9,
+    };
+
+    // create an index buffer interface called i_buffer
+    D3DDevice->CreateIndexBuffer(18 * sizeof(short),
+                              0,
+                              D3DFMT_INDEX16,
+                              D3DPOOL_MANAGED,
+                              &IndexBuffer,
+                              NULL);
+
+    // lock i_buffer and load the Indices into it
+    IndexBuffer->Lock(0, 0, (void **) &BufferBeginning, 0);
+    memcpy(BufferBeginning, Indices, sizeof(Indices));
+    IndexBuffer->Unlock();
 }
