@@ -9,12 +9,12 @@
 #define SCREEN_WIDTH  800
 #define SCREEN_HEIGHT 600
 
-#define CUSTOMFVF (D3DFVF_XYZ | D3DFVF_DIFFUSE)
+#define CUSTOMFVF (D3DFVF_XYZ | D3DFVF_NORMAL)
 
 struct custom_vertex
 {
     FLOAT x, y, z;
-    DWORD color;
+    D3DVECTOR Normal;
 };
 
 LPDIRECT3DVERTEXBUFFER9 VertexBuffer = NULL;
@@ -31,7 +31,7 @@ void ReleaseD3D(void);
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, 
                             WPARAM wParam, LPARAM lParam);
 void InitGraphics(void);
-
+void InitLightAndMaterial(void);
 
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -129,6 +129,33 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 }
 
 
+void InitLightAndMaterial(void)
+{
+    D3DLIGHT9 Light;    // create the Light struct
+    D3DMATERIAL9 Material; // create a material
+
+    ZeroMemory(&Light, sizeof(Light));    // clear out the Light struct for use
+    Light.Type = D3DLIGHT_POINT;    // make the Light type 'directional Light'
+    Light.Diffuse = D3DXCOLOR(0.5f, 0.5f, 0.5f, 1.0f);    // set the Light's color
+    Light.Direction = D3DXVECTOR3(-1.0f, -0.3f, -1.0f);
+    Light.Position = D3DXVECTOR3(0.0f, 5.0f, 0.0f);
+    Light.Range = 100.0f;    // a range of 100
+    Light.Attenuation0 = 0.0f;    // no constant inverse attenuation
+    Light.Attenuation1 = 0.125f;    // only .125 inverse attenuation
+    Light.Attenuation2 = 0.0f;    // no square inverse attenuation
+
+    D3DDevice->SetLight(0, &Light);    // send the Light struct properties to Light #0
+    D3DDevice->LightEnable(0, TRUE);    // turn on Light #0
+
+    ZeroMemory(&Material, sizeof(D3DMATERIAL9));    // clear out the struct for use
+    Material.Diffuse = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);    // set diffuse color to white
+    Material.Ambient = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);    // set ambient color to white
+
+    D3DDevice->SetMaterial(&Material);
+}
+
+
+
 void InitD3D(HWND Window)
 {
     D3DInterface = Direct3DCreate9(D3D_SDK_VERSION); // create the Direct3D interface
@@ -152,9 +179,11 @@ void InitD3D(HWND Window)
                                &D3DPresentParams,
                                &D3DDevice);
     InitGraphics();
-    D3DDevice->SetRenderState(D3DRS_LIGHTING, FALSE);   // turnoff 3d lighting
-    D3DDevice->SetRenderState(D3DRS_CULLMODE, D3DCULL_NONE); // shade both sides of the triangles
+    InitLightAndMaterial();
+    D3DDevice->SetRenderState(D3DRS_LIGHTING, true);
+    D3DDevice->SetRenderState(D3DRS_AMBIENT, D3DCOLOR_XRGB(50, 50, 50));
     D3DDevice->SetRenderState(D3DRS_ZENABLE, TRUE); // turn on the z-buffer
+    D3DDevice->SetRenderState(D3DRS_NORMALIZENORMALS, TRUE); // handle normals scaling
 }
 
 
@@ -188,12 +217,16 @@ void RenderFrame(void)
     // set the world transforms
     D3DXMATRIX MatRotateY; // a matrix to store the rotation for each triangle
     D3DXMatrixRotationY(&MatRotateY, YRotation); // the rotation matrix
-    D3DDevice->SetTransform(D3DTS_WORLD, &(MatRotateY)); // set the world transform
+    D3DXMATRIX MatTranslate;
+    D3DXMatrixTranslation(&MatTranslate,
+                          (float) sin(YRotation) * 12.0f, 0.0f, 
+                          (float) cos(YRotation) * 25.0f);
+    D3DDevice->SetTransform(D3DTS_WORLD, &(MatTranslate)); // set the world transform
 
     // select the vertex buffer to display
     D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(custom_vertex));
     D3DDevice->SetIndices(IndexBuffer);
-    D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 10, 0, 6);
+    D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 24, 0, 12);
 
     D3DDevice->EndScene();
     D3DDevice->Present(NULL, NULL, NULL, NULL);
@@ -216,24 +249,38 @@ void InitGraphics()
     // create the Vertices using the custom_vertex struct
     custom_vertex Vertices[] =
     {
-        // fuselage
-        {3.0f, 0.0f, 0.0f, D3DCOLOR_XRGB(0, 255, 0), },
-        {0.0f, 3.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
-        {0.0f, 0.0f, 10.0f, D3DCOLOR_XRGB(255, 0, 0), },
-        {-3.0f, 0.0f, 0.0f, D3DCOLOR_XRGB(0, 255, 255), },
+        {-3.0f, -3.0f, 3.0f, 0.0f, 0.0f, 1.0f, },    // side 1
+        {3.0f, -3.0f, 3.0f, 0.0f, 0.0f, 1.0f, },
+        {-3.0f, 3.0f, 3.0f, 0.0f, 0.0f, 1.0f, },
+        {3.0f, 3.0f, 3.0f, 0.0f, 0.0f, 1.0f, },
 
-        // left gun
-        {3.2f, -1.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
-        {3.2f, -1.0f, 11.0f, D3DCOLOR_XRGB(0, 255, 0), },
-        {2.0f, 1.0f, 2.0f, D3DCOLOR_XRGB(255, 0, 0), },
+        {-3.0f, -3.0f, -3.0f, 0.0f, 0.0f, -1.0f, },    // side 2
+        {-3.0f, 3.0f, -3.0f, 0.0f, 0.0f, -1.0f, },
+        {3.0f, -3.0f, -3.0f, 0.0f, 0.0f, -1.0f, },
+        {3.0f, 3.0f, -3.0f, 0.0f, 0.0f, -1.0f, },
 
-        // right gun
-        {-3.2f, -1.0f, -3.0f, D3DCOLOR_XRGB(0, 0, 255), },
-        {-3.2f, -1.0f, 11.0f, D3DCOLOR_XRGB(0, 255, 0), },
-        {-2.0f, 1.0f, 2.0f, D3DCOLOR_XRGB(255, 0, 0), },
+        {-3.0f, 3.0f, -3.0f, 0.0f, 1.0f, 0.0f, },    // side 3
+        {-3.0f, 3.0f, 3.0f, 0.0f, 1.0f, 0.0f, },
+        {3.0f, 3.0f, -3.0f, 0.0f, 1.0f, 0.0f, },
+        {3.0f, 3.0f, 3.0f, 0.0f, 1.0f, 0.0f, },
+
+        {-3.0f, -3.0f, -3.0f, 0.0f, -1.0f, 0.0f, },    // side 4
+        {3.0f, -3.0f, -3.0f, 0.0f, -1.0f, 0.0f, },
+        {-3.0f, -3.0f, 3.0f, 0.0f, -1.0f, 0.0f, },
+        {3.0f, -3.0f, 3.0f, 0.0f, -1.0f, 0.0f, },
+
+        {3.0f, -3.0f, -3.0f, 1.0f, 0.0f, 0.0f, },    // side 5
+        {3.0f, 3.0f, -3.0f, 1.0f, 0.0f, 0.0f, },
+        {3.0f, -3.0f, 3.0f, 1.0f, 0.0f, 0.0f, },
+        {3.0f, 3.0f, 3.0f, 1.0f, 0.0f, 0.0f, },
+
+        {-3.0f, -3.0f, -3.0f, -1.0f, 0.0f, 0.0f, },    // side 6
+        {-3.0f, -3.0f, 3.0f, -1.0f, 0.0f, 0.0f, },
+        {-3.0f, 3.0f, -3.0f, -1.0f, 0.0f, 0.0f, },
+        {-3.0f, 3.0f, 3.0f, -1.0f, 0.0f, 0.0f, },
     };
     // create a vertex buffer interface called VertexBuffer
-    D3DDevice->CreateVertexBuffer(10 * sizeof(custom_vertex),
+    D3DDevice->CreateVertexBuffer(24 * sizeof(custom_vertex),
                                   0, CUSTOMFVF,
                                   D3DPOOL_MANAGED,
                                   &VertexBuffer, NULL);
@@ -248,16 +295,22 @@ void InitGraphics()
     // create the Indices using an int array
     short Indices[] =
     {
-        0, 1, 2,    // fuselage
+        0, 1, 2,    // side 1
         2, 1, 3,
-        3, 1, 0,
-        0, 2, 3,
-        4, 5, 6,    // wings
-        7, 8, 9,
+        4, 5, 6,    // side 2
+        6, 5, 7,
+        8, 9, 10,    // side 3
+        10, 9, 11,
+        12, 13, 14,    // side 4
+        14, 13, 15,
+        16, 17, 18,    // side 5
+        18, 17, 19,
+        20, 21, 22,    // side 6
+        22, 21, 23,
     };
 
     // create an index buffer interface called i_buffer
-    D3DDevice->CreateIndexBuffer(18 * sizeof(short),
+    D3DDevice->CreateIndexBuffer(36 * sizeof(short),
                               0,
                               D3DFMT_INDEX16,
                               D3DPOOL_MANAGED,
