@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29911.84
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "directxtutorial.com", "directxtutorial.com\directxtutorial.com.vcxproj", "{7125E496-1E04-420A-88A6-643A06AE14A8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7125E496-1E04-420A-88A6-643A06AE14A8}.Debug|x64.ActiveCfg = Debug|x64
+		{7125E496-1E04-420A-88A6-643A06AE14A8}.Debug|x64.Build.0 = Debug|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EDA3156B-DD51-4763-B1FF-68168F80418B}
+	EndGlobalSection
+EndGlobal
