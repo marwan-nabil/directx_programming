@@ -1,93 +1,86 @@
-#include <Windows.h>
-#include <d3dx9.h>
+#include "window.h"
 
-#pragma comment (lib, "d3d9.lib")
-#pragma comment (lib, "d3dx9.lib")
-#pragma comment (lib, "winmm.lib")
 
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 480
-
+int Running;
 IDirect3D9 *D3DInterface;
 IDirect3DDevice9 *D3DDevice;
 IDirect3DVertexBuffer9 *VertexBuffer;
 IDirect3DIndexBuffer9 *IndexBuffer;
-int Running;
 
-
-struct vertex
-{
-    float x, y, z;
-};
-#define MYFVF D3DFVF_XYZ
+// -------------------------------------
+//  rotating pyramid with directional light source
+// -------------------------------------
 
 
 void SetupPipeline()
 {
-    // fill a vertex buffer with a cube
-    D3DDevice->CreateVertexBuffer(8 * sizeof(struct vertex),
-                                  D3DUSAGE_WRITEONLY,
-                                  MYFVF,
-                                  D3DPOOL_MANAGED,
-                                  &VertexBuffer, 0);
-    vertex *Vertices;
-    VertexBuffer->Lock(0, 0, (void **) &Vertices, 0);
-    Vertices[0] = {-1.0f, -1.0f, -1.0f};
-    Vertices[1] = {-1.0f, 1.0f, -1.0f};
-    Vertices[2] = {1.0f, 1.0f, -1.0f};
-    Vertices[3] = {1.0f, -1.0f, -1.0f};
-    Vertices[4] = {-1.0f, -1.0f, 1.0f};
-    Vertices[5] = {-1.0f, 1.0f, 1.0f};
-    Vertices[6] = {1.0f, 1.0f, 1.0f};
-    Vertices[7] = {1.0f, -1.0f, 1.0f};
+    // enable lighting
+    D3DDevice->SetRenderState(D3DRS_LIGHTING, 1);
+
+    // put a pyramid in the vertex buffer, each side has 3 vertices,
+    // we'll not share vertices because each face has a different normal
+    D3DDevice->CreateVertexBuffer(12 * sizeof(vertex), D3DUSAGE_WRITEONLY,
+                                  MYFVF, D3DPOOL_MANAGED, &VertexBuffer, 0);
+    vertex *VPtr;
+    VertexBuffer->Lock(0, 0, (void **) &VPtr, 0);
+    // front face (no vertices sharing)
+    VPtr[0] = {-1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f};
+    VPtr[1] = {0.0f, 1.0f, 0.0f, 0.0f, 0.707f, -0.707f};
+    VPtr[2] = {1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f};
+    // left face
+    VPtr[3] = {-1.0f, 0.0f, 1.0f, -0.707f, 0.707f, 0.0f};
+    VPtr[4] = {0.0f, 1.0f, 0.0f, -0.707f, 0.707f, 0.0f};
+    VPtr[5] = {-1.0f, 0.0f, -1.0f, -0.707f, 0.707f, 0.0f};
+    // right face
+    VPtr[6] = {1.0f, 0.0f, -1.0f, 0.707f, 0.707f, 0.0};
+    VPtr[7] = {0.0f, 1.0f, 0.0f, 0.707f, 0.707f, 0.0f};
+    VPtr[8] = {1.0f, 0.0f, 1.0f, 0.707f, 0.707f, 0.0f};
+    // back face
+    VPtr[9] = {1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f};
+    VPtr[10] = {0.0f, 1.0f, 0.0f, 0.0f, 0.707f, 0.707f};
+    VPtr[11] = {-1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f};
     VertexBuffer->Unlock();
 
-    // create an index buffer for that triangle and fill it
-    D3DDevice->CreateIndexBuffer(36 * sizeof(WORD),
-                                 D3DUSAGE_WRITEONLY,
-                                 D3DFMT_INDEX16,
-                                 D3DPOOL_MANAGED,
-                                 &IndexBuffer,
-                                 0);
-    WORD *indices = 0;
-    IndexBuffer->Lock(0, 0, (void **) &indices, 0);
-    // front side
-    indices[0] = 0; indices[1] = 1; indices[2] = 2;
-    indices[3] = 0; indices[4] = 2; indices[5] = 3;
-    // back side
-    indices[6] = 4; indices[7] = 6; indices[8] = 5;
-    indices[9] = 4; indices[10] = 7; indices[11] = 6;
-    // left side
-    indices[12] = 4; indices[13] = 5; indices[14] = 1;
-    indices[15] = 4; indices[16] = 1; indices[17] = 0;
-    // right side
-    indices[18] = 3; indices[19] = 2; indices[20] = 6;
-    indices[21] = 3; indices[22] = 6; indices[23] = 7;
-    // top
-    indices[24] = 1; indices[25] = 5; indices[26] = 6;
-    indices[27] = 1; indices[28] = 6; indices[29] = 2;
-    // bottom
-    indices[30] = 4; indices[31] = 0; indices[32] = 3;
-    indices[33] = 4; indices[34] = 3; indices[35] = 7;
-    IndexBuffer->Unlock();
+    // create the pyramid material
+    D3DMATERIAL9 PyramidMaterial;
+    PyramidMaterial.Ambient = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+    PyramidMaterial.Specular = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+    PyramidMaterial.Diffuse = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+    PyramidMaterial.Emissive = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
+    PyramidMaterial.Power = 5.0f;
+    D3DDevice->SetMaterial(&PyramidMaterial);
 
-    // view (camera) transformation
+    // create a directional light source
+    D3DLIGHT9 DirectionalLight;
+    ZeroMemory(&DirectionalLight, sizeof(D3DLIGHT9));
+    DirectionalLight.Type = D3DLIGHT_DIRECTIONAL;
+    DirectionalLight.Diffuse = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
+    DirectionalLight.Specular = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f) * 0.3f;
+    DirectionalLight.Ambient = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f) * 0.6f;
+    DirectionalLight.Direction = D3DXVECTOR3(1.0f, 0.0f, 0.0f);
+
+    D3DDevice->SetLight(0, &DirectionalLight);
+    D3DDevice->LightEnable(0, 1);
+
+    // re-normalize vertex normals after transformations
+    D3DDevice->SetRenderState(D3DRS_NORMALIZENORMALS, 1);
+    // enable specular lighting
+    D3DDevice->SetRenderState(D3DRS_SPECULARENABLE, 1);
+
+    // view (camera) matrix
     D3DXVECTOR3 position(0.0f, 0.0f, -5.0f); // eye
     D3DXVECTOR3 target(0.0f, 0.0f, 0.0f); // at
     D3DXVECTOR3 up(0.0f, 1.0f, 0.0f); // up
-    D3DXMATRIX ViewTrans;
-    D3DXMatrixLookAtLH(&ViewTrans, &position, &target, &up);
-    D3DDevice->SetTransform(D3DTS_VIEW, &ViewTrans);
+    D3DXMATRIX ViewMat;
+    D3DXMatrixLookAtLH(&ViewMat, &position, &target, &up);
+    D3DDevice->SetTransform(D3DTS_VIEW, &ViewMat);
 
-    // setup the projection matrix
-    D3DXMATRIX ProjMat;
-    D3DXMatrixPerspectiveFovLH(&ProjMat, D3DX_PI * 0.5f, 
+    // projection matrix
+    D3DXMATRIX ProjectionMat;
+    D3DXMatrixPerspectiveFovLH(&ProjectionMat, 0.5f * D3DX_PI,
                                (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT,
                                1.0f, 1000.0f);
-    D3DDevice->SetTransform(D3DTS_PROJECTION, &ProjMat);
-
-    // set the render mode as wireframe
-    D3DDevice->SetRenderState(D3DRS_FILLMODE, D3DFILL_WIREFRAME);
+    D3DDevice->SetTransform(D3DTS_PROJECTION, &ProjectionMat);
 }
 
 
@@ -96,54 +89,33 @@ UpdateAndRender(float TimeDelta)
 {
     if(D3DDevice)
     {
-        // setup the world transform (rotating with time)
-        D3DXMATRIX XRotation, YRotation;
-
-        // rotate on x-axis with time
-        static float XAngle = 0.0f;
-        D3DXMatrixRotationX(&XRotation, 3.14f / 4.0f * XAngle);
-        XAngle += TimeDelta;
-        if(XAngle >= 6.28f)
-            XAngle = 0.0f;
-
-        // incremement Y-rotation angle with time
+        // 
+        // Rotate the pyramid.
+        //
+        D3DXMATRIX YRotMat;
         static float YAngle = 0.0f;
-        D3DXMatrixRotationY(&YRotation, YAngle);
+        D3DXMatrixRotationY(&YRotMat, YAngle);
         YAngle += TimeDelta;
 
-        // reset angle to zero when angle reaches 2*PI
         if(YAngle >= 6.28f)
             YAngle = 0.0f;
 
-        // calculate the final world transform
-        D3DXMATRIX WorldTrans = XRotation * YRotation;
-        D3DDevice->SetTransform(D3DTS_WORLD, &WorldTrans);
+        D3DDevice->SetTransform(D3DTS_WORLD, &YRotMat);
 
-        D3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
+        // clear the screen and draw the pyramid
+        D3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00000000, 1.0f, 0);
         D3DDevice->BeginScene();
 
-        D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(struct vertex));
-        D3DDevice->SetIndices(IndexBuffer);
+        D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(vertex));
         D3DDevice->SetFVF(MYFVF);
 
-        // draw a cube
-        D3DDevice->DrawIndexedPrimitive(D3DPT_TRIANGLELIST, 0, 0, 8, 0, 12);
+        D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 4);
 
         D3DDevice->EndScene();
         D3DDevice->Present(0, 0, 0, 0);
     }
     return 1;
 }
-
-
-void
-CleanUp()
-{
-    VertexBuffer->Release();
-    D3DDevice->Release();
-    D3DInterface->Release();
-}
-
 
 void
 InitializeDirect3D(HWND Window)
@@ -160,7 +132,7 @@ InitializeDirect3D(HWND Window)
     {
         Flags = D3DCREATE_SOFTWARE_VERTEXPROCESSING;
     }
-    
+
     D3DPRESENT_PARAMETERS PresentParams;
     PresentParams.BackBufferWidth = WINDOW_WIDTH;
     PresentParams.BackBufferHeight = WINDOW_HEIGHT;
@@ -170,7 +142,7 @@ InitializeDirect3D(HWND Window)
     PresentParams.MultiSampleQuality = 0;
     PresentParams.SwapEffect = D3DSWAPEFFECT_DISCARD;
     PresentParams.hDeviceWindow = Window;
-    PresentParams.Windowed = 0;
+    PresentParams.Windowed = 1;
     PresentParams.EnableAutoDepthStencil = 1;
     PresentParams.AutoDepthStencilFormat = D3DFMT_D24S8;
     PresentParams.Flags = 0;
@@ -184,6 +156,15 @@ InitializeDirect3D(HWND Window)
     {
         MessageBoxA(0, "D3DInterface->CreateDevice() Failed.", 0, 0);
     }
+}
+
+
+void
+CleanUp()
+{
+    D3DDevice->Release();
+    D3DInterface->Release();
+    VertexBuffer->Release();
 }
 
 
@@ -201,6 +182,7 @@ MainWindowProcedure(HWND   Window,
             {
                 DestroyWindow(Window);
             }
+            break;
         case WM_CLOSE:
         {
             PostQuitMessage(0);
@@ -280,8 +262,8 @@ WinMain(HINSTANCE hInstance,
         // -----------------
         float Time = (float) timeGetTime();
         float TimeDelta = (Time - LastTime) * 0.001f;
-        UpdateAndRender(TimeDelta);
         LastTime = Time;
+        UpdateAndRender(TimeDelta);
     }
 
     CleanUp();
