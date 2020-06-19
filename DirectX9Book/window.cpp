@@ -1,4 +1,5 @@
 #include "window.h"
+#include "cube.h"
 
 
 int Running;
@@ -7,6 +8,7 @@ IDirect3DDevice9 *D3DDevice;
 IDirect3DVertexBuffer9 *VertexBuffer;
 IDirect3DIndexBuffer9 *IndexBuffer;
 IDirect3DTexture9 *Texture;
+cube Cube;
 
 // -------------------------------------
 //  using textures
@@ -15,27 +17,18 @@ IDirect3DTexture9 *Texture;
 
 void SetupPipeline()
 {
-    D3DDevice->CreateVertexBuffer(
-        6 * sizeof(vertex),
-        D3DUSAGE_WRITEONLY,
-        MYFVF,
-        D3DPOOL_MANAGED,
-        &VertexBuffer,
-        0);
+    Cube = MakeCube(D3DDevice);
+    // make a directional light
+    D3DXVECTOR3 Direction = {1.0f, -1.0f, 0.0f};
+    D3DXCOLOR Color = {0.8f, 0.8f, 0.8f, 1.0f};
+    D3DLIGHT9 DirLight = InitDirectionalLight(&Direction, &Color);
+    D3DDevice->SetLight(0, &DirLight);
+    D3DDevice->LightEnable(0, 1);
 
-    vertex *vptr;
-    VertexBuffer->Lock(0, 0, (void **) &vptr, 0);
-    // quad built from two triangles, note texture coordinates:
-    vptr[0] = {-1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f};
-    vptr[1] = {-1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f};
-    vptr[2] = {1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f};
-    vptr[3] = {-1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f};
-    vptr[4] = {1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f};
-    vptr[5] = {1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f};
-    VertexBuffer->Unlock();
+    D3DDevice->SetRenderState(D3DRS_NORMALIZENORMALS, 1);
+    D3DDevice->SetRenderState(D3DRS_SPECULARENABLE, 1);
 
-    D3DXCreateTextureFromFileA(D3DDevice, "dx5_logo.bmp", &Texture);
-    D3DDevice->SetTexture(0, Texture);
+    D3DXCreateTextureFromFileA(D3DDevice, "crate.jpg", &Texture);
 
     // enable some texture filters
     D3DDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
@@ -48,8 +41,6 @@ void SetupPipeline()
                                ((float) WINDOW_WIDTH / (float) WINDOW_HEIGHT),
                                1.0f, 1000.0f);
     D3DDevice->SetTransform(D3DTS_PROJECTION, &ProjMat);
-    // disable lighting
-    D3DDevice->SetRenderState(D3DRS_LIGHTING, 0);
 }
 
 
@@ -58,13 +49,40 @@ UpdateAndRender(float TimeDelta)
 {
     if(D3DDevice)
     {
-        D3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00000000, 1.0f, 0);
+        // 
+        // Update the scene: update camera position.
+        //
+        static float angle = (3.0f * D3DX_PI) / 2.0f;
+        static float height = 2.0f;
+
+        if(GetAsyncKeyState(VK_LEFT) & 0x8000f)
+            angle -= 0.5f * TimeDelta;
+
+        if(GetAsyncKeyState(VK_RIGHT) & 0x8000f)
+            angle += 0.5f * TimeDelta;
+
+        if(GetAsyncKeyState(VK_UP) & 0x8000f)
+            height += 5.0f * TimeDelta;
+
+        if(GetAsyncKeyState(VK_DOWN) & 0x8000f)
+            height -= 5.0f * TimeDelta;
+
+        D3DXVECTOR3 position(cosf(angle) * 3.0f, height, sinf(angle) * 3.0f);
+        D3DXVECTOR3 target(0.0f, 0.0f, 0.0f);
+        D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+        D3DXMATRIX V;
+        D3DXMatrixLookAtLH(&V, &position, &target, &up);
+
+        D3DDevice->SetTransform(D3DTS_VIEW, &V);
+
+        // Draw the scene:
+        D3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0xffffffff, 1.0f, 0);
         D3DDevice->BeginScene();
 
-        D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(vertex));
-        D3DDevice->SetFVF(MYFVF);
+        D3DDevice->SetMaterial(&WHITE_MTRL);
+        D3DDevice->SetTexture(0, Texture);
 
-        D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2);
+        DrawCube(&Cube, 0, 0, 0);
 
         D3DDevice->EndScene();
         D3DDevice->Present(0, 0, 0, 0);
