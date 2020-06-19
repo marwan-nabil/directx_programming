@@ -6,81 +6,50 @@ IDirect3D9 *D3DInterface;
 IDirect3DDevice9 *D3DDevice;
 IDirect3DVertexBuffer9 *VertexBuffer;
 IDirect3DIndexBuffer9 *IndexBuffer;
+IDirect3DTexture9 *Texture;
 
 // -------------------------------------
-//  rotating pyramid with directional light source
+//  using textures
 // -------------------------------------
 
 
 void SetupPipeline()
 {
-    // enable lighting
-    D3DDevice->SetRenderState(D3DRS_LIGHTING, 1);
+    D3DDevice->CreateVertexBuffer(
+        6 * sizeof(vertex),
+        D3DUSAGE_WRITEONLY,
+        MYFVF,
+        D3DPOOL_MANAGED,
+        &VertexBuffer,
+        0);
 
-    // put a pyramid in the vertex buffer, each side has 3 vertices,
-    // we'll not share vertices because each face has a different normal
-    D3DDevice->CreateVertexBuffer(12 * sizeof(vertex), D3DUSAGE_WRITEONLY,
-                                  MYFVF, D3DPOOL_MANAGED, &VertexBuffer, 0);
-    vertex *VPtr;
-    VertexBuffer->Lock(0, 0, (void **) &VPtr, 0);
-    // front face (no vertices sharing)
-    VPtr[0] = {-1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f};
-    VPtr[1] = {0.0f, 1.0f, 0.0f, 0.0f, 0.707f, -0.707f};
-    VPtr[2] = {1.0f, 0.0f, -1.0f, 0.0f, 0.707f, -0.707f};
-    // left face
-    VPtr[3] = {-1.0f, 0.0f, 1.0f, -0.707f, 0.707f, 0.0f};
-    VPtr[4] = {0.0f, 1.0f, 0.0f, -0.707f, 0.707f, 0.0f};
-    VPtr[5] = {-1.0f, 0.0f, -1.0f, -0.707f, 0.707f, 0.0f};
-    // right face
-    VPtr[6] = {1.0f, 0.0f, -1.0f, 0.707f, 0.707f, 0.0};
-    VPtr[7] = {0.0f, 1.0f, 0.0f, 0.707f, 0.707f, 0.0f};
-    VPtr[8] = {1.0f, 0.0f, 1.0f, 0.707f, 0.707f, 0.0f};
-    // back face
-    VPtr[9] = {1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f};
-    VPtr[10] = {0.0f, 1.0f, 0.0f, 0.0f, 0.707f, 0.707f};
-    VPtr[11] = {-1.0f, 0.0f, 1.0f, 0.0f, 0.707f, 0.707f};
+    vertex *vptr;
+    VertexBuffer->Lock(0, 0, (void **) &vptr, 0);
+    // quad built from two triangles, note texture coordinates:
+    vptr[0] = {-1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f};
+    vptr[1] = {-1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f};
+    vptr[2] = {1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f};
+    vptr[3] = {-1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f};
+    vptr[4] = {1.0f, 1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f};
+    vptr[5] = {1.0f, -1.0f, 1.25f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f};
     VertexBuffer->Unlock();
 
-    // create the pyramid material
-    D3DMATERIAL9 PyramidMaterial;
-    PyramidMaterial.Ambient = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
-    PyramidMaterial.Specular = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
-    PyramidMaterial.Diffuse = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
-    PyramidMaterial.Emissive = D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f);
-    PyramidMaterial.Power = 5.0f;
-    D3DDevice->SetMaterial(&PyramidMaterial);
+    D3DXCreateTextureFromFileA(D3DDevice, "dx5_logo.bmp", &Texture);
+    D3DDevice->SetTexture(0, Texture);
 
-    // create a directional light source
-    D3DLIGHT9 DirectionalLight;
-    ZeroMemory(&DirectionalLight, sizeof(D3DLIGHT9));
-    DirectionalLight.Type = D3DLIGHT_DIRECTIONAL;
-    DirectionalLight.Diffuse = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f);
-    DirectionalLight.Specular = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f) * 0.3f;
-    DirectionalLight.Ambient = D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f) * 0.6f;
-    DirectionalLight.Direction = D3DXVECTOR3(1.0f, 0.0f, 0.0f);
+    // enable some texture filters
+    D3DDevice->SetSamplerState(0, D3DSAMP_MAGFILTER, D3DTEXF_LINEAR);
+    D3DDevice->SetSamplerState(0, D3DSAMP_MINFILTER, D3DTEXF_LINEAR);
+    D3DDevice->SetSamplerState(0, D3DSAMP_MIPFILTER, D3DTEXF_POINT);
 
-    D3DDevice->SetLight(0, &DirectionalLight);
-    D3DDevice->LightEnable(0, 1);
-
-    // re-normalize vertex normals after transformations
-    D3DDevice->SetRenderState(D3DRS_NORMALIZENORMALS, 1);
-    // enable specular lighting
-    D3DDevice->SetRenderState(D3DRS_SPECULARENABLE, 1);
-
-    // view (camera) matrix
-    D3DXVECTOR3 position(0.0f, 0.0f, -5.0f); // eye
-    D3DXVECTOR3 target(0.0f, 0.0f, 0.0f); // at
-    D3DXVECTOR3 up(0.0f, 1.0f, 0.0f); // up
-    D3DXMATRIX ViewMat;
-    D3DXMatrixLookAtLH(&ViewMat, &position, &target, &up);
-    D3DDevice->SetTransform(D3DTS_VIEW, &ViewMat);
-
-    // projection matrix
-    D3DXMATRIX ProjectionMat;
-    D3DXMatrixPerspectiveFovLH(&ProjectionMat, 0.5f * D3DX_PI,
-                               (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT,
+    // set-up the projection matrix
+    D3DXMATRIX ProjMat;
+    D3DXMatrixPerspectiveFovLH(&ProjMat, D3DX_PI * 0.5, 
+                               ((float) WINDOW_WIDTH / (float) WINDOW_HEIGHT),
                                1.0f, 1000.0f);
-    D3DDevice->SetTransform(D3DTS_PROJECTION, &ProjectionMat);
+    D3DDevice->SetTransform(D3DTS_PROJECTION, &ProjMat);
+    // disable lighting
+    D3DDevice->SetRenderState(D3DRS_LIGHTING, 0);
 }
 
 
@@ -89,27 +58,13 @@ UpdateAndRender(float TimeDelta)
 {
     if(D3DDevice)
     {
-        // 
-        // Rotate the pyramid.
-        //
-        D3DXMATRIX YRotMat;
-        static float YAngle = 0.0f;
-        D3DXMatrixRotationY(&YRotMat, YAngle);
-        YAngle += TimeDelta;
-
-        if(YAngle >= 6.28f)
-            YAngle = 0.0f;
-
-        D3DDevice->SetTransform(D3DTS_WORLD, &YRotMat);
-
-        // clear the screen and draw the pyramid
         D3DDevice->Clear(0, 0, D3DCLEAR_TARGET | D3DCLEAR_ZBUFFER, 0x00000000, 1.0f, 0);
         D3DDevice->BeginScene();
 
         D3DDevice->SetStreamSource(0, VertexBuffer, 0, sizeof(vertex));
         D3DDevice->SetFVF(MYFVF);
 
-        D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 4);
+        D3DDevice->DrawPrimitive(D3DPT_TRIANGLELIST, 0, 2);
 
         D3DDevice->EndScene();
         D3DDevice->Present(0, 0, 0, 0);

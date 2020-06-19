@@ -38,8 +38,9 @@ typedef struct
 {
     float X, Y, Z;
     float NX, NY, NZ;
+    float U, V; // texture coordinates
 } vertex;
-#define MYFVF (D3DFVF_XYZ | D3DFVF_NORMAL)
+#define MYFVF (D3DFVF_XYZ | D3DFVF_NORMAL | D3DFVF_TEX1)
 
 
 // Lights stuff
