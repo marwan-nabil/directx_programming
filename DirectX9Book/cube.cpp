@@ -1,3 +1,4 @@
+#include <d3dx9.h>
 #include "window.h"
 #include "cube.h"
 

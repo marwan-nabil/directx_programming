@@ -1,6 +1,4 @@
 #pragma once
-#include <d3dx9.h>
-
 
 struct cube {
     IDirect3DDevice9 *Device;

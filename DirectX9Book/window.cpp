@@ -1,5 +1,13 @@
+#include <Windows.h>
+#include <d3dx9.h>
+
+#pragma comment (lib, "d3d9.lib")
+#pragma comment (lib, "d3dx9.lib")
+#pragma comment (lib, "winmm.lib")
+
 #include "window.h"
 #include "cube.h"
+#include "utils.h"
 
 
 int Running;

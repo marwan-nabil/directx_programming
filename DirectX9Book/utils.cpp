@@ -1,4 +1,5 @@
-#include "window.h"
+#include <d3dx9.h>
+#include "utils.h"
 
 //
 // some colors
